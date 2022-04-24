@@ -25,7 +25,6 @@ class PostView(View):
         return JsonResponse(data, json_dumps_params={'ensure_ascii': False})
 
     def post(self, request):
-        print(request)
         try:
             post_body = json.loads(request.body)
             if request.user.is_authenticated:
@@ -97,3 +96,29 @@ class PostReadUpdateDeleteView(View):
         return JsonResponse(data, json_dumps_params={'ensure_ascii': False}, status=status)
 
 
+@method_decorator(csrf_exempt, name='dispatch')
+class CommentCreateView(View):
+    def post(self, request):
+        try:
+            comment_body = json.loads(request.body)
+            comment_data = {
+                'text': comment_body.get('text'),
+            }
+            if request.user.is_authenticated:
+                comment_data["author"] = comment_body.get('username')
+            if 'reply' in comment_body:
+                comment_data['reply'] = comment_body.get('reply')
+            if 'post' in comment_body:
+                comment_data['post_id'] = comment_body.get('post')
+            comment_obj = Comment.objects.create(**comment_data)
+            data = {
+                'message': f'Добавлен новый комментарий(id{comment_obj.pk}) к статье № {comment_obj.post.pk}.'
+            }
+            status = 201
+        except Exception as ex:
+            data = {
+                'message': f'Произошла ошибка. Статья НЕ добавлена!',
+                'Error': str(ex)
+            }
+            status = 500
+        return JsonResponse(data, status=status, json_dumps_params={'ensure_ascii': False})
