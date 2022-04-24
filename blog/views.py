@@ -6,7 +6,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
 from .models import *
-from .serializers import post_serializer
+from .serializers import post_serializer, comment_serializer
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -27,16 +27,11 @@ class PostView(View):
     def post(self, request):
         try:
             post_body = json.loads(request.body)
+            post_data = {
+                'content': post_body.get('content'),
+            }
             if request.user.is_authenticated:
-                post_data = {
-                    'content': post_body.get('content'),
-                    'author': post_body.get('username')
-                }
-            else:
-                post_data = {
-                    'content': post_body.get('content'),
-                    'author': None
-                }
+                post_data['author'] = post_body.get('username')
             post_obj = Post.objects.create(**post_data)
             data = {
                 'message': f'Добавлена новая статья под номером: {post_obj.pk}'
@@ -44,7 +39,7 @@ class PostView(View):
             status = 201
         except Exception as ex:
             data = {
-                'message': f'Произошла ошибка. Статья НЕ добавлена!',
+                'message': f'Произошла ошибка. Статья не добавлена!',
                 'Error': str(ex)
             }
             status = 500
@@ -89,7 +84,7 @@ class PostReadUpdateDeleteView(View):
             status = 200
         except Exception as ex:
             data = {
-                'message': f'Произошла ошибка. Статья под номером: {post_id} НЕ изменена',
+                'message': f'Произошла ошибка. Статья под номером: {post_id} не изменена',
                 'Error': str(ex)
             }
             status = 500
@@ -107,7 +102,7 @@ class CommentCreateView(View):
             if request.user.is_authenticated:
                 comment_data["author"] = comment_body.get('username')
             if 'reply' in comment_body:
-                comment_data['reply'] = comment_body.get('reply')
+                comment_data['reply_id'] = comment_body.get('reply')
             if 'post' in comment_body:
                 comment_data['post_id'] = comment_body.get('post')
             comment_obj = Comment.objects.create(**comment_data)
@@ -117,8 +112,56 @@ class CommentCreateView(View):
             status = 201
         except Exception as ex:
             data = {
-                'message': f'Произошла ошибка. Статья НЕ добавлена!',
+                'message': f'Произошла ошибка. Комментарий не добавлен!',
                 'Error': str(ex)
             }
             status = 500
         return JsonResponse(data, status=status, json_dumps_params={'ensure_ascii': False})
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class CommentReadUpdateDeleteView(View):
+    def get(self, request, comment_id):
+        try:
+            return JsonResponse(comment_serializer(comment_id), json_dumps_params={'ensure_ascii': False})
+        except Exception as ex:
+            return HttpResponseNotFound(f'Страница не найдена')
+
+    def put(self, request, comment_id):
+        put_body = json.loads(request.body)
+        try:
+            comment = Comment.objects.get(pk=comment_id)
+            comment.text = put_body.get('text')
+            if request.user.is_authenticated:
+                comment.author = put_body.get('username')
+            if 'reply' in put_body:
+                comment.reply_id = put_body.get('reply')
+            comment.save()
+            data = {
+                'message': f'Комментарий id{comment_id} успешно изменен',
+                'post': comment_serializer(comment_id)
+            }
+            status = 201
+        except Exception as ex:
+            data = {
+                'message': f'Произошла ошибка. Комментарий id{comment_id} не изменен!',
+                'Error': str(ex)
+            }
+            status = 500
+        return JsonResponse(data, json_dumps_params={'ensure_ascii': False}, status=status)
+
+    def delete(self, request, comment_id):
+        try:
+            comment = Comment.objects.get(pk=comment_id)
+            comment.delete()
+            data = {
+                'message': f'Комментарий id{comment_id} успешно удален',
+            }
+            status = 200
+        except Exception as ex:
+            data = {
+                'message': f'Произошла ошибка. Комментарий id{comment_id} не получилось удалить!',
+                'Error': str(ex)
+            }
+            status = 500
+        return JsonResponse(data, json_dumps_params={'ensure_ascii': False}, status=status)
