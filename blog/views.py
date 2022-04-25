@@ -6,7 +6,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
 from .models import *
-from .serializers import post_serializer, comment_serializer
+from .serializers import post_serializer, comment_serializer, comment_all_reply_serializer
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -165,3 +165,12 @@ class CommentReadUpdateDeleteView(View):
             }
             status = 500
         return JsonResponse(data, json_dumps_params={'ensure_ascii': False}, status=status)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class CommentReadAllReplyView(View):
+    def get(self, request, comment_id):
+        try:
+            return JsonResponse(comment_all_reply_serializer(comment_id), json_dumps_params={'ensure_ascii': False})
+        except Exception as ex:
+            return HttpResponseNotFound(f'Страница не найдена')
